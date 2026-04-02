@@ -15,14 +15,16 @@ OWNER_ID   = int(os.getenv("OWNER_ID", "0"))
 
 bot = interactions.Client(token=BOT_TOKEN)
 
-# In-memory token store: {user_id: app.at token}
+# In-memory token store: {user_id: {app_at, cf_clearance}}
 user_tokens = {}
 
 
 # ====================== HELPERS ======================
-def get_scraper(app_at: str):
+def get_scraper(app_at: str, cf_clearance: str = ""):
     scraper = cloudscraper.create_scraper(browser={"browser": "chrome", "platform": "windows", "mobile": False})
     scraper.cookies.set("app.at", app_at, domain="bloxflip.com")
+    if cf_clearance:
+        scraper.cookies.set("cf_clearance", cf_clearance, domain="bloxflip.com")
     scraper.headers.update({
         "accept": "application/json, text/plain, */*",
         "referer": "https://bloxflip.com/mines",
@@ -65,26 +67,31 @@ def is_valid_bloxflip_id(game_id: str) -> bool:
 
 
 # ====================== /login ======================
-@interactions.slash_command(name="login", description="Login with your Bloxflip app.at cookie")
+@interactions.slash_command(name="login", description="Login with your Bloxflip cookies")
 @interactions.slash_option(
     name="token",
     description="Your app.at cookie from bloxflip.com",
     opt_type=interactions.OptionType.STRING,
     required=True
 )
-async def login_cmd(ctx: interactions.SlashContext, token: str):
-    # Verify token works
+@interactions.slash_option(
+    name="cf_clearance",
+    description="Your cf_clearance cookie from bloxflip.com",
+    opt_type=interactions.OptionType.STRING,
+    required=True
+)
+async def login_cmd(ctx: interactions.SlashContext, token: str, cf_clearance: str):
     try:
-        scraper = get_scraper(token)
+        scraper = get_scraper(token, cf_clearance)
         resp = scraper.get("https://bloxflip.com/api/games/mines", timeout=10).json()
         if not resp.get("success"):
-            await ctx.send("❌ Invalid token — make sure you copied the full `app.at` cookie.", ephemeral=True)
+            await ctx.send("❌ Invalid token — make sure you copied both cookies correctly.", ephemeral=True)
             return
     except Exception as e:
         await ctx.send(f"❌ Failed to verify token: {e}", ephemeral=True)
         return
 
-    user_tokens[ctx.author.id] = token
+    user_tokens[ctx.author.id] = {"app_at": token, "cf_clearance": cf_clearance}
     await ctx.send("✅ Logged in successfully! You can now use `/mines` and `/towers`.", ephemeral=True)
     print(f"{ctx.author} logged in")
 
@@ -100,17 +107,17 @@ async def login_cmd(ctx: interactions.SlashContext, token: str):
     max_value=23
 )
 async def mines_cmd(ctx: interactions.SlashContext, safe_clicks: int):
-    token = user_tokens.get(ctx.author.id)
-    if not token:
-        await ctx.send("❌ You need to `/login` first with your Bloxflip `app.at` cookie.", ephemeral=True)
+    creds = user_tokens.get(ctx.author.id)
+    if not creds:
+        await ctx.send("❌ You need to `/login` first with your Bloxflip cookies.", ephemeral=True)
         return
 
     try:
-        scraper = get_scraper(token)
+        scraper = get_scraper(creds["app_at"], creds["cf_clearance"])
         data = scraper.get("https://bloxflip.com/api/games/mines", timeout=10).json()
 
         if not data.get("success"):
-            await ctx.send("❌ Failed to fetch game data. Try `/login` again.", ephemeral=True)
+            await ctx.send("❌ Failed to fetch game data. Try `/login` again with fresh cookies.", ephemeral=True)
             return
 
         if not data.get("hasGame"):
@@ -139,7 +146,7 @@ async def mines_cmd(ctx: interactions.SlashContext, safe_clicks: int):
 
     except Exception as e:
         print(f"Mines error: {e}")
-        await ctx.send("❌ Error fetching your game. Try `/login` again.", ephemeral=True)
+        await ctx.send("❌ Error fetching your game. Try `/login` again with fresh cookies.", ephemeral=True)
 
 
 # ====================== /towers ======================
