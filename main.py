@@ -21,13 +21,16 @@ user_tokens = {}
 
 # ====================== HELPERS ======================
 def get_scraper(app_at: str):
-    scraper = cloudscraper.create_scraper()
+    scraper = cloudscraper.create_scraper(browser={"browser": "chrome", "platform": "windows", "mobile": False})
     scraper.cookies.set("app.at", app_at, domain="bloxflip.com")
     scraper.headers.update({
         "accept": "application/json, text/plain, */*",
         "referer": "https://bloxflip.com/mines",
         "x-currency": "ROCOINS",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+        "accept-language": "en-US,en;q=0.9",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
     })
     return scraper
 
@@ -174,7 +177,7 @@ async def towers_cmd(ctx: interactions.SlashContext, game_id: str, rows: int):
 @interactions.slash_command(name="crash", description="Predict the next Bloxflip Crash multiplier")
 async def crash_cmd(ctx: interactions.SlashContext):
     try:
-        scraper = cloudscraper.create_scraper()
+        scraper = cloudscraper.create_scraper(browser={"browser": "chrome", "platform": "windows", "mobile": False})
         data = scraper.get("https://rest-bf.blox.land/games/crash", timeout=10).json()
 
         history = data.get("history", [])
