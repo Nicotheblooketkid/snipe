@@ -31,6 +31,8 @@ def fetch_mines(app_at: str):
         "cookie": f"app.at={app_at}"
     }
     resp = requests.get("https://bloxflip.com/api/games/mines", headers=headers, timeout=10)
+    print(f"Status: {resp.status_code}")
+    print(f"Response: {resp.text[:500]}")
     return resp.json()
 
 def generate_mines_grid(mine_count: int, safe_clicks: int, uncovered: list) -> str:
